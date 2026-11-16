@@ -39,9 +39,22 @@ installed outside the official store.
 
 ## Validation status
 
-The app itself still needs a first build + install on real hardware (the Gradle
-wrapper jar isn't checked in; open in Android Studio). What **has** been validated
-on a real **onn. 4K Pro** (jarvis2, Android 14):
+**Built, installed and run on a real onn. 4K Pro** (jarvis2, Android 14): the app
+compiles (Gradle 8.9 / AGP 8.5.2 / SDK 34), launches on the TV, completes a scan,
+and renders the full report — and its verdict **matches the validated ADB tool
+exactly: 85/100, grade B, 0 IOC, 0 YARA**. D-pad focus, the persistence card, and
+the per-app cards (hash + VirusTotal prompt) all work on-device.
+
+Two issues were found and fixed by that on-hardware run:
+- **Self-detection** — the app bundles the YARA rules + IOC feed as assets, so
+  scanning its *own* APK matched every indicator and self-reported "malicious".
+  Fixed by excluding our own package from the inventory.
+- **Memory/perf** — the first YARA pass decoded each APK entry to a UTF-16 String
+  (and lower-cased a copy), which GC-thrashed the TV heap (196 MB, blocking GCs).
+  Rewrote it as a bounded, streaming, single-pass byte matcher with first-byte
+  dispatch, and scoped YARA to sideloaded apps only.
+
+Earlier, before the on-device run, the core logic had also been validated:
 
 - **Core triage logic** — the ADB tool these classes port scored the device
   **85/100 (grade B)**: firmware locked/verified, SELinux enforcing, 0/182 IOC hits,
@@ -56,8 +69,8 @@ on a real **onn. 4K Pro** (jarvis2, Android 14):
     on the decompressed entries. (Because it decompresses ZIP entries, it actually
     catches strings that raw-byte `yara file.apk` misses inside compressed DEX.)
 
-Still pending: installing the built APK on the TV, and a run on an actual **Fire TV
-Stick** (Fire OS paths are implemented and unit-logic-tested, not yet hardware-run).
+Still pending: a run on an actual **Fire TV Stick** (Fire OS paths are implemented
+and unit-logic-tested, not yet hardware-run), and on a **TCL** Google TV set.
 
 ## What it deliberately does NOT do (this tier)
 
@@ -137,5 +150,5 @@ android/
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)
 - [x] Proper TV banner artwork (320×180) + D-pad focus polish (focus highlight +
       scale, initial focus on the action bar)
-- [~] Real-device validation — see below. Core logic + YARA engine validated on a
-      real onn. 4K Pro; on-hardware APK install and a Fire TV Stick still pending.
+- [x] Real-device validation on an **onn. 4K Pro** — built, installed, scanned,
+      verdict matches the ADB tool (85/B). Fire TV Stick + TCL still to do.

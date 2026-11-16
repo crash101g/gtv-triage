@@ -21,14 +21,15 @@ import java.util.zip.ZipFile
  * need real YARA features, swap this for a Shizuku-invoked `yara` or an NDK build.
  *
  * Scanning: APKs are ZIP archives, and the indicator strings live inside compressed
- * entries (classes.dex, lib/*.so, the manifest, resources). So we decompress each
+ * entries (classes.dex, native libs, the manifest, resources). So we decompress each
  * entry and match against its bytes — scanning the raw .apk bytes would miss them.
  */
 class YaraEngine private constructor(private val rules: List<YaraRule>) {
 
     companion object {
-        private const val PER_ENTRY_CAP = 32 * 1024 * 1024        // 32 MiB / entry
-        private const val TOTAL_CAP = 96L * 1024 * 1024           // 96 MiB / apk
+        // Per-APK budget across all decompressed entries. Streamed in ~1 MiB chunks,
+        // so memory stays bounded regardless of this cap.
+        private const val TOTAL_CAP = 64L * 1024 * 1024           // 64 MiB / apk
 
         fun fromAsset(context: Context, name: String = "gtv-malware.yar"): YaraEngine {
             val text = context.assets.open(name).bufferedReader().use { it.readText() }
@@ -38,12 +39,48 @@ class YaraEngine private constructor(private val rules: List<YaraRule>) {
         fun fromText(text: String): YaraEngine = YaraEngine(YaraParser(text).parse())
     }
 
+    /**
+     * Needles precomputed once: rule-scoped key, the literal as raw bytes (Latin-1,
+     * ASCII in practice), and a nocase flag. For nocase the bytes are pre-lowercased
+     * so matching only has to fold the haystack byte. Kept as bytes so scanning never
+     * allocates a UTF-16 String (which doubled memory and caused GC thrash on a TV).
+     */
+    private class Needle(val key: String, val bytes: ByteArray, val nocase: Boolean)
+
+    private val needles: List<Needle> by lazy {
+        rules.flatMap { rule ->
+            rule.strings.map { s ->
+                val raw = s.literal.toByteArray(Charsets.ISO_8859_1)
+                val bytes = if (s.nocase) ByteArray(raw.size) { lc(raw[it]) } else raw
+                Needle(rule.key(s.id), bytes, s.nocase)
+            }
+        }
+    }
+    private val maxNeedle: Int by lazy { needles.maxOfOrNull { it.bytes.size } ?: 0 }
+
+    // First-byte dispatch tables so the buffer is scanned ONCE for all needles
+    // instead of once per needle. csTable[b] holds case-sensitive needles starting
+    // with byte b; ncTable[lb] holds nocase needles whose (lowercased) first byte is
+    // lb. At each position we only test the few needles whose first byte can match.
+    private val csTable: Array<List<Needle>?> by lazy { buildTable(caseSensitive = true) }
+    private val ncTable: Array<List<Needle>?> by lazy { buildTable(caseSensitive = false) }
+
+    private fun buildTable(caseSensitive: Boolean): Array<List<Needle>?> {
+        val buckets = arrayOfNulls<MutableList<Needle>>(256)
+        for (nd in needles) {
+            if (nd.bytes.isEmpty() || nd.nocase == caseSensitive) continue
+            val b = nd.bytes[0].toInt() and 0xFF
+            (buckets[b] ?: ArrayList<Needle>().also { buckets[b] = it }).add(nd)
+        }
+        @Suppress("UNCHECKED_CAST")
+        return Array(256) { buckets[it] as List<Needle>? }
+    }
+
     /** @return the names of the rules that match this APK file (empty if none). */
     fun scanApk(path: String?): List<String> {
         val file = path?.let { File(it) } ?: return emptyList()
-        if (!file.isFile) return emptyList()
+        if (!file.isFile || maxNeedle == 0) return emptyList()
         val counts = HashMap<String, Int>()
-        val anyNocase = rules.any { r -> r.strings.any { it.nocase } }
         var scanned = 0L
 
         try {
@@ -52,16 +89,15 @@ class YaraEngine private constructor(private val rules: List<YaraRule>) {
                 while (entries.hasMoreElements() && scanned < TOTAL_CAP) {
                     val e = entries.nextElement()
                     if (e.isDirectory) continue
-                    val bytes = zip.getInputStream(e).use { readBounded(it, PER_ENTRY_CAP) }
-                    scanned += bytes.size
-                    accumulate(bytes, anyNocase, counts)
+                    // Each entry is its own byte stream, so a needle can't span two
+                    // entries — scan each independently, bounded, in small chunks.
+                    scanned += zip.getInputStream(e).use { scanStream(it, counts, TOTAL_CAP - scanned) }
                 }
             }
         } catch (ex: Exception) {
-            // Not a valid ZIP (or unreadable) — fall back to scanning raw bytes.
+            // Not a valid ZIP (or unreadable) — scan the raw bytes instead.
             try {
-                val bytes = file.inputStream().use { readBounded(it, PER_ENTRY_CAP) }
-                accumulate(bytes, anyNocase, counts)
+                file.inputStream().use { scanStream(it, counts, TOTAL_CAP) }
             } catch (_: Exception) {
                 return emptyList()
             }
@@ -70,47 +106,68 @@ class YaraEngine private constructor(private val rules: List<YaraRule>) {
         return rules.filter { it.matches(counts) }.map { it.name }
     }
 
-    private fun accumulate(bytes: ByteArray, anyNocase: Boolean, counts: HashMap<String, Int>) {
-        // Latin-1 keeps a 1:1 byte<->char mapping, so binary content matches cleanly.
-        val hay = String(bytes, Charsets.ISO_8859_1)
-        val hayLower = if (anyNocase) hay.lowercase() else hay
-        for (rule in rules) {
-            for (s in rule.strings) {
-                val h = if (s.nocase) hayLower else hay
-                val n = if (s.nocase) s.literal.lowercase() else s.literal
-                val c = countOcc(h, n)
-                // Key by rule as well as id: YARA string ids are rule-scoped, so e.g.
-                // $p1 in two rules must not share a count (would cause false matches).
-                if (c > 0) {
-                    val key = rule.key(s.id)
-                    counts[key] = (counts[key] ?: 0) + c
-                }
-            }
-        }
-    }
-
-    private fun countOcc(hay: String, needle: String): Int {
-        if (needle.isEmpty()) return 0
-        var i = hay.indexOf(needle)
-        var c = 0
-        while (i >= 0) {
-            c++
-            i = hay.indexOf(needle, i + needle.length)
-        }
-        return c
-    }
-
-    private fun readBounded(input: java.io.InputStream, cap: Int): ByteArray {
-        val buf = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(64 * 1024)
-        var total = 0
-        while (total < cap) {
+    /**
+     * Streams one source in ~1 MiB chunks, carrying (maxNeedle-1) bytes across chunk
+     * boundaries so a match split across chunks is still found. Memory stays bounded
+     * (~1 MiB) regardless of entry size. Returns bytes consumed.
+     */
+    private fun scanStream(input: java.io.InputStream, counts: HashMap<String, Int>, budget: Long): Long {
+        val chunkSize = 1 shl 20
+        val overlap = maxNeedle - 1
+        val chunk = ByteArray(chunkSize)
+        var carry = ByteArray(0)
+        var consumed = 0L
+        while (consumed < budget) {
             val r = input.read(chunk)
             if (r < 0) break
-            buf.write(chunk, 0, r)
-            total += r
+            consumed += r
+            val bufLen = carry.size + r
+            val buf = ByteArray(bufLen)
+            System.arraycopy(carry, 0, buf, 0, carry.size)
+            System.arraycopy(chunk, 0, buf, carry.size, r)
+            scanBuffer(buf, bufLen, carry.size, counts)
+            val keep = if (overlap < bufLen) overlap else bufLen
+            carry = buf.copyOfRange(bufLen - keep, bufLen)
         }
-        return buf.toByteArray()
+        return consumed
+    }
+
+    /**
+     * Single pass over buf[0,bufLen): at each position consult the first-byte dispatch
+     * tables and test only the needles that could start there. A match is counted when
+     * it extends past [carryLen] (so carried bytes aren't counted twice across chunks).
+     */
+    private fun scanBuffer(buf: ByteArray, bufLen: Int, carryLen: Int, counts: HashMap<String, Int>) {
+        for (i in 0 until bufLen) {
+            val b = buf[i].toInt() and 0xFF
+            csTable[b]?.let { for (nd in it) tally(buf, bufLen, i, carryLen, nd, counts) }
+            val lb = lc(buf[i]).toInt() and 0xFF
+            ncTable[lb]?.let { for (nd in it) tally(buf, bufLen, i, carryLen, nd, counts) }
+        }
+    }
+
+    private fun tally(buf: ByteArray, bufLen: Int, i: Int, carryLen: Int, nd: Needle, counts: HashMap<String, Int>) {
+        val L = nd.bytes.size
+        if (i + L > bufLen) return
+        if (i + L <= carryLen) return      // wholly inside the carry — already counted
+        if (!matchAt(buf, i, nd)) return
+        counts[nd.key] = (counts[nd.key] ?: 0) + 1
+    }
+
+    private fun matchAt(buf: ByteArray, pos: Int, nd: Needle): Boolean {
+        val n = nd.bytes
+        if (nd.nocase) {
+            for (k in n.indices) if (lc(buf[pos + k]) != n[k]) return false
+        } else {
+            for (k in n.indices) if (buf[pos + k] != n[k]) return false
+        }
+        return true
+    }
+
+    /** ASCII lower-case a single byte (A-Z -> a-z); leaves everything else as-is. */
+    private fun lc(b: Byte): Byte {
+        val v = b.toInt()
+        return if (v in 65..90) (v + 32).toByte() else b
     }
 }
 

@@ -22,8 +22,14 @@ class PackageInventory(private val context: Context) {
 
     fun collect(): List<RawApp> {
         val pm = context.packageManager
+        val self = context.packageName
         val packages = pm.getInstalledPackages(0)
-        return packages.map { pi ->
+        return packages.asSequence()
+            // Never triage ourselves: this app bundles the YARA rules and IOC feed as
+            // assets, so scanning its own APK would match every indicator and self-
+            // report as "malicious". The checker is not a subject of the scan.
+            .filter { it.packageName != self }
+            .map { pi ->
             val ai: ApplicationInfo? = pi.applicationInfo
             val isSystem = ai != null && (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0
             RawApp(
@@ -33,7 +39,7 @@ class PackageInventory(private val context: Context) {
                 installer = installerOf(pm, pi.packageName),
                 isSystem = isSystem,
             )
-        }
+        }.toList()
     }
 
     private fun installerOf(pm: PackageManager, pkg: String): String? = try {

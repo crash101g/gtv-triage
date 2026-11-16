@@ -33,9 +33,10 @@ class TriageEngine(private val context: Context) {
             // Hash third-party apps (sideloaded first-class, store apps for reference).
             val sha = if (!raw.isSystem) ApkHasher.sha256(raw.sourceDir) else null
             val hits = ioc.match(raw.packageName, raw.installer, raw.sourceDir)
-            // YARA-scan the same third-party set we hash (scanning every system app
-            // would be slow and low-yield). Decompresses the APK's ZIP entries.
-            val yaraHits = if (!raw.isSystem) yara?.scanApk(raw.sourceDir).orEmpty() else emptyList()
+            // YARA-scan SIDELOADED apps only — the sideload-vetting scope. Scanning
+            // every third-party/store app (big games included) decompresses hundreds
+            // of MB and is far too slow/heavy on a TV; sideloads are what matter here.
+            val yaraHits = if (sideloaded) yara?.scanApk(raw.sourceDir).orEmpty() else emptyList()
             AppEntry(
                 packageName = raw.packageName,
                 label = raw.label,
