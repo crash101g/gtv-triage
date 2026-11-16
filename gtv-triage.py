@@ -191,6 +191,19 @@ KNOWN_BAD_MODELS.update({m: m.upper() for m in GENERIC_MODELS})
 MODEL_PROPS = ("ro.product.model", "ro.product.device", "ro.product.name",
                "ro.build.product", "ro.product.board", "ro.product.vendor.model")
 
+# Installer package names that count as a trusted first-party app store, so their
+# apps are NOT labelled "sideloaded". Google Play is the default; on Amazon Fire
+# OS the Appstore / Amazon-signed updaters are added (see is_fireos / store_installers).
+PLAY_INSTALLER = "com.android.vending"
+AMAZON_STORE_PREFIX = "com.amazon."   # Appstore (com.amazon.venezia) + Amazon updaters
+
+def is_fireos(props):
+    """True if the device is Amazon Fire OS (a non-Google AOSP fork). Fire OS has
+    no Play Store, so Google-centric 'non-Play = sideloaded' logic must be relaxed."""
+    return (props.get("ro.product.manufacturer", "").strip().lower() == "amazon"
+            or "/Amazon/" in props.get("ro.build.fingerprint", "")
+            or "amazon" in props.get("ro.product.brand", "").strip().lower())
+
 # Package names that ARE known Vo1d / BADBOX malware (unique/unambiguous).
 # Installed-presence of any of these is treated as a malicious indicator.
 MALWARE_PACKAGES = {m.lower() for m in (
@@ -628,6 +641,17 @@ def main():
 
     # ---- parse ----
     props = parse_props(data["getprop"])
+    fireos = is_fireos(props)
+
+    def is_store_installer(inst):
+        """A trusted first-party app store for THIS device (so its apps aren't
+        'sideloaded'). Google Play everywhere; Amazon Appstore/updaters on Fire OS."""
+        if inst == PLAY_INSTALLER:
+            return True
+        if fireos and inst.startswith(AMAZON_STORE_PREFIX):
+            return True
+        return False
+
     pkgs = parse_packages(data["packages_all"])
     umap = uid_map(pkgs)
     procs = parse_ps(data["ps"])
@@ -689,7 +713,8 @@ def main():
     note = lambda msg: S.append(f"      {msg}")
 
     S.append(f"tv-triage run {run.name}")
-    S.append(f"Device: {props.get('ro.product.manufacturer')} {props.get('ro.product.model')}")
+    S.append(f"Device: {props.get('ro.product.manufacturer')} {props.get('ro.product.model')}"
+             + ("  [Fire OS detected - Amazon Appstore treated as trusted store]" if fireos else ""))
     S.append(f"Fingerprint: {props.get('ro.build.fingerprint')}")
     S.append(f"Security patch: {props.get('ro.build.version.security_patch')}\n")
 
@@ -762,9 +787,10 @@ def main():
     S.append("\n== Packages ==")
     note(f"{len(pkgs)} total, {len(sys_pkgs)} system, {len(tp_pkgs)} third-party")
     sideloaded = sorted(n for n in tp_pkgs
-                        if pkgs.get(n, {}).get("installer", "?") != "com.android.vending")
+                        if not is_store_installer(pkgs.get(n, {}).get("installer", "?")))
+    side_label = "sideloaded (not from Appstore/Play)" if fireos else "sideloaded / non-Play"
     for n in sideloaded:
-        note(f"sideloaded/non-Play: {n} (installer={pkgs.get(n, {}).get('installer', '?')})")
+        note(f"{side_label}: {n} (installer={pkgs.get(n, {}).get('installer', '?')})")
     unread = [l for l in apk_lines if " UNREADABLE " in l]
     if unread:
         flag(f"{len(unread)} APKs could not be hashed (see norm/apk_hashes.txt)")
@@ -818,9 +844,14 @@ def main():
         except (IndexError, ValueError):
             return -1
 
+    trusted_owner_prefixes = ["com.google.", "com.android.", "android"]
+    if fireos:
+        # Fire OS system/Whisperplay/DIAL listeners are Amazon-owned, not Google.
+        trusted_owner_prefixes.append("com.amazon.")
+
     def listen_expected(l):
         return (listen_port(l) in EXPECTED_LISTEN_PORTS
-                or listen_owner(l).startswith(("com.google.", "com.android.", "android")))
+                or listen_owner(l).startswith(tuple(trusted_owner_prefixes)))
 
     ext_listen = [l for l in listening if not is_local(l.split()[1].rsplit(":", 1)[0])]
     unexpected_listen = []
@@ -1074,7 +1105,7 @@ def main():
     if ls:
         R("MEDIUM", "/data/local/tmp is not empty")
     for n in sideloaded:
-        R("LOW", f"sideloaded / non-Play app: {n}")
+        R("LOW", f"{side_label} app: {n}")
     for ioc, where in ioc_hits:
         R("HIGH", f"IOC '{ioc}' matched ({where})")
     for sev, text in vt_findings:

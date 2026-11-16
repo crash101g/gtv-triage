@@ -28,9 +28,9 @@
 ## Who it's for
 
 `gtv-triage` works on **any** Android TV / Google TV device — a Chromecast with Google
-TV, an onn., a Shield, a TCL/Sony set, or a no-name AOSP box. It answers two questions
-over plain ADB-over-Wi-Fi in about 30 seconds, without rooting, flashing, or sending
-anything to the cloud:
+TV, an onn., a Shield, a TCL/Sony set, an **Amazon Fire TV Stick** (Fire OS), or a
+no-name AOSP box. It answers two questions over plain ADB-over-Wi-Fi in about 30
+seconds, without rooting, flashing, or sending anything to the cloud:
 
 ### 1. 🧩 "I sideloaded apps — are any of them sketchy?"
 The moment you install an APK from **outside the Play Store** — Downloader, a GitHub
@@ -194,6 +194,12 @@ apps worth a look).
   boxes**, per Google — a certified device is very unlikely to ship with them. The
   *sideload-vetting* use case applies to **every** Android TV / Google TV device,
   certified or not, because sideloading bypasses Play Protect regardless of brand.
+- **Fire OS aware.** On Amazon Fire TV (which has no Play Store) the tool auto-detects
+  Fire OS and treats the **Amazon Appstore / Amazon-signed updaters** as a trusted store,
+  so only *genuinely* sideloaded apps (Downloader, APK mirrors, `null` installer) are
+  flagged — and Amazon system listeners aren't mislabeled as non-standard. Discovery
+  finds a Fire Stick via the ADB port-5555 sweep (it doesn't announce Google Cast), or
+  just use `--device <ip>:5555`.
 
 ---
 
