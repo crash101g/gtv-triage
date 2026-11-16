@@ -59,8 +59,11 @@ jobs:
 
   python:
     name: Python syntax check
-    runs-on: ubuntu-latest
+    # 22.04 still provides older Pythons via setup-python so we can test a real
+    # lower bound; 26.04 runners only ship recent versions.
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.13"]
     steps:
