@@ -1,0 +1,285 @@
+# gtv-iocs.txt — Indicators of compromise for malware seen on Android TV /
+# "Google TV" boxes (predominantly off-brand AOSP devices). Use with:
+#
+#     ./gtv-triage.py --device <ip> --ioc gtv-iocs.txt
+#
+# FORMAT: one indicator per line; '#' begins a comment. gtv-triage matches
+# each line case-insensitively as a SUBSTRING against the normalized lists in
+# norm/ and against raw/netstat.txt (packages, processes, sockets, settings,
+# init services, apk paths, etc.). Entries are chosen to be specific enough
+# not to false-positive; deliberately short/generic tokens (e.g. a bare "wd")
+# are given as full paths instead.
+#
+# SCOPE NOTE: Google states these infections are on non-Play-Protect-certified
+# AOSP devices, not licensed Google TV / Android TV. "Google TV" is used
+# loosely here for the affected low-cost streaming-box ecosystem.
+#
+# SOURCES (verify / refresh before an engagement — threat infra rotates):
+#   BADBOX 2.0 — HUMAN Security (Satori), 2025
+#     https://www.humansecurity.com/learn/blog/satori-threat-intelligence-disruption-badbox-2-0/
+#   Android.Vo1d — Doctor Web, 2024
+#     https://github.com/DoctorWebLtd/malware-iocs/tree/master/Android.Vo1d
+#   FBI IC3 public service announcement on BADBOX 2.0 (2025)
+#
+# Compiled: 2026-11-15.  Vo1d and BADBOX 2.0 share infrastructure (overlapping
+# C2 domains and the libanl.so backdoor library); domains are merged below.
+
+# ===========================================================================
+# PACKAGE NAMES
+# ===========================================================================
+# Vo1d masquerades as a Google system component (the real one is
+# com.google.android.gms — this exact name is a spoof):
+com.google.android.services
+# BADBOX / BADBOX 2.0 loader + payload packages/classes:
+com.hs.app
+com.hs.cld
+com.hs.q
+com.mz.sdk
+com.debby.devour
+
+# ===========================================================================
+# FILE PATHS / DROPPED ARTIFACTS / NATIVE LIBRARIES  (full paths = safe)
+# ===========================================================================
+# Vo1d native backdoor binaries:
+/system/xbin/vo1d
+/system/xbin/wd
+/data/google/daemon
+# BADBOX/Vo1d shared backdoor library + BADBOX dropped payloads:
+libanl.so
+/.p.jar
+/.q.jar
+/.p.oat
+/.q.oat
+
+# ===========================================================================
+# C2 DOMAINS  (BADBOX 2.0 appendix + article body, merged with Vo1d)
+# ===========================================================================
+meiboot.com
+bitemores.com
+catmos99.com
+catmore88.com
+cbphe.com
+cbpheback.com
+cpbheback.com
+6f33933ce4a5c0e1b32fea736a61351a.com
+100ulife.com
+99soya.shop
+ad3g.com
+admoyu.com
+ads-goal.com
+ai-goal.com
+apotube.com
+app-goal.com
+appclicking.com
+astrolink.cn
+bltproxy.com
+bluefish.work
+bullet-proxy.com
+clickby.net
+clocksyn.com
+coslogdydy.in
+cxlcyy.com
+cxzyr.com
+dazzl.vip
+dc16888888.com
+dcylog.com
+dqmop.com
+duoduodev.com
+easyjoy.me
+echojoy.xyz
+file.long.tv
+finemob.com
+firehub.link
+firehub.work
+flyermobi.com
+fuhidd.com
+g1ee.com
+giddy.cc
+goologer.com
+heygames.club
+huulog.com
+huuww.com
+ipforyou.top
+ipmoyu.com
+jasmine.land
+jolted.vip
+joyfulxx.com
+jutux.work
+logcer.com
+long.tv
+meisvip.com
+moonhub.work
+motiyu.net
+moyix.com
+moyu88.xyz
+msohu.online
+msohu.shop
+mtcpmpm.com
+mtcprogram.com
+mtcpuouo.com
+mymoyu.shop
+navnow.xyz
+net-goal.com
+pccyy.com
+pcxrl.com
+pcxrlback.com
+petrel-ip.com
+pixelscast.com
+pixlo.cc
+pm2za.cc
+qazwsxedc.xyz
+qocoll.com
+qulogger.com
+randomhow.com
+retrofitxer.com
+rzless.work
+shanhulan.cn
+simplekds.me
+soyatea.online
+sparkjoy.cc
+supportdatainput.top
+sustat.com
+swiftcode.work
+syloger.com
+sysbinder.com
+sysbinder.xyz
+ttyunos.com
+tuding.xyz
+tvsnapp.com
+1ztop.work
+veezy.site
+vividweb.work
+vmud.net
+wildpettykiwi.com
+wildpettykiwi.info
+wildpettykiwi.xyz
+wotads.com
+ycxad.com
+ycxrl.com
+ycxrldow.com
+yeyeyeye.xyz
+yxcrl.com
+yydsma.com
+yydsmb.com
+yydsmd.com
+yydsmr.com
+ziyemy.shop
+ztword.com
+zxcvbnmasdfghjkl.xyz
+
+# ===========================================================================
+# REFERENCE: Vo1d native-binary SHA-1 hashes  (Doctor Web)
+# ===========================================================================
+# These are SHA-1 sums of the on-device ELF backdoors. They will NOT match
+# gtv-triage's norm/apk_hashes.txt (that list is SHA-256 of APKs), so they are
+# here for analysis of PULLED binaries / YARA / manual `sha1sum | grep`, not
+# for the substring scan. Format: file-hash (decrypted-payload-hash).
+#
+# Android.Vo1d.1  /system/xbin/vo1d
+#   f3732871371819532416cf2ec03ea103a3d61802 (675f9a34f6f8dc887e47aa85fffda41c178eb186)
+#   637c491d29eb87a30d22a7db1ccb38ad447c8de8 (9a8b7a85742330970e067f2b80ada9e295b0e035)
+#   42def5b7eb8b1bcc727739cca98efe42c022a3f6 (4b1135c6cade7e17548982338bfa9382e3c234f0)
+# Android.Vo1d.3  /system/xbin/wd
+#   8399c41b0d24c30391d7fba6b634ba29c0440007 (ccf8c0cb83160a20fa4c89b028fb63884f7b6a86)
+#   e5b16486eebd6c6f7c45197f530e854a4f1373dd (cd3c8d0ca99400c86e7e4943e85669f291c52a74)
+#   51bd967bd7d59a8a9db8083094603a9d10e61ded (3e941c34af4e07496f515c35eddaff145e06c42a)
+#   0b3c8113e996ac4e08552761731f9f97b8f0f6a2 (2d2ceddafbce5afe79e3424ebc32dea4d5dff1fe)
+#   0d51c034a6deda4d2db21c5852b8ceb8a1e1c68b (51d17a5a1950db3236c9db3249ab0dcb03223d11)
+#   9dcc109ac2c5f873ece422aed0687ba21d594e9b (e05c1338426a07a49eb3491e08abbc3f96b047b3)
+#   e5406ae7482c0062cedafbd118a493ab8b7fe530 (c53a76845a78ec9b613442a208b5b2ea8fbecc91)
+# Android.Vo1d.5  /data/google/daemon
+#   e34c6a13ccbecf7560d4cb8a32872b8aabd5f8db (825df85d82a3de5e4bf6347dcba47e3ec48dbd52)
+#   3e21821a1e6edb684f3931d685b908d4a8df3f19 (6707cbb2b4e09911c4ada7e24c05e4fbd66a7851)
+#   b1cf85aaf1a355677534ea12c19b034c656804ec (89788eabef15303c142fff33dfd560e619595ae5)
+#   ed975255eba30345de74936e24b9b3090f26ed7e (182939085a9aa1d6f0e60da31b200cd644522748)
+#   3ce81fbb1d968e01e970c4c673a7eeb61c247c85 (436f200abfc0db4ae6138b0b2f1ab67af57ca506)
+#   0c7f9f33a40a6028dbef416b2385876c87f1bd48 (df71b68c4172ef7f23949c643550c40d0f81fa83)
+#   6e06d0decf5e211183a751b206dd533f91c13b22 (b6a00590a3b0b175fa2ec910744875dd5be995ac)
+# Android.Vo1d.1.origin  com.google.android.services
+#   7f87f9f059a58eb830d59af5bcb29c612b2a6ccf
+#   9fcdfb9cadabe12283a002755a27a4a68a101949
+#   25f93476cb8dc6a7f727a88ece0c5a0c19157c0b
+#   3a4d90b9911e7e582cf3279b15f2f822a5bb2823
+#   b315be9d64e22960f6072aac60538b13d50da054
+#   618b98eb97f38ffa7b384b0932fd4b92c8877f60
+#   b474c279da7b08fd64f92b0781e2663bf6cbb4b6
+
+# ===========================================================================
+# ADDITIONAL INDICATORS — aggregated Android-TV-box feed
+# (DesktopECHO/T95-H616-Malware + proxyware-blocklist, via the
+#  VortexisTV/Android-Proxy-Botnet-IOC-Scanner "seed-bundled" set).
+# Scope-limited to the Google-TV-relevant families; the feed's general
+# IoT/DVR botnet families (aisuru, jackskid, katana, kimwolf, cecbot, etc.)
+# are intentionally NOT included here (not TV-box threats, high FP, some
+# contain offensive/PII strings). See that repo if you need them.
+# ===========================================================================
+
+# ---- Vo1d: additional packages (masquerade names) ----
+com.google.android.gms.stable
+com.goog1e.apps
+com.rmk.app.AllPlayer
+com.nasa.cook.CookInit
+com.sun.galaxy.lib.OceanInit
+# ---- Vo1d: additional file paths ----
+/data/google/rild
+/data/system/installd
+/data/system/startup
+/data/data/com.goog1e.apps
+# ---- Vo1d: additional C2 domains ----
+ssl8rrs2.com
+ttekf42.com
+ttss442.com
+works883.com
+works883.xyz
+csskkjw.com
+catmore23.com
+synntre.com
+csok997.com
+conannt.com
+haveits.com
+remoredo.com
+ssl87362.com
+wowokeys.com
+# ---- Vo1d: C2 IPs (WEAK SIGNAL — several are AWS and may be reassigned;
+#      corroborate against DNS/router logs before acting) ----
+38.46.218.36
+38.46.218.37
+38.46.218.38
+38.46.218.39
+3.146.93.253
+3.132.75.97
+3.17.255.32
+13.229.152.241
+18.139.54.2
+
+# ---- BADBOX (original / "T95") — Triada-style preinstalled backdoor ----
+com.adups.fota
+com.mozgame.fruitmania
+com.ftest
+com.www.intallapp
+com.swe.dgbluancher
+/data/system/Corejava
+/data/system/shared_prefs/open_preference.xml
+/data/data/com.adups.fota
+dotinapp.com
+
+# ---- Proxyware / PEACHPIT (DUAL-USE: these SDKs are also legitimately
+#      user-installed residential-proxy / "earn money" apps. Presence is a
+#      REVIEW item, not proof of compromise. Package/SDK tokens only; the
+#      proxyware *domains* live in gtv-malware.yar for scanning APK contents.)
+com.honeygain
+com.iproyal
+peer2profit
+traffmonetizer
+earnapp
+bitping
+packetstream
+joinmassive
+getgrass
+infatica
+# NetNut/POPA residential-proxy SDK identifiers seen embedded in TV apps:
+neunative
+alphasdk
+popanet
+gms-native
+brd.sdk

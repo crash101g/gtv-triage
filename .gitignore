@@ -1,0 +1,17 @@
+# Triage output contains real device data (serials, IPs, installed-app lists,
+# hashes) — never commit it.
+tv-triage-runs/
+*.run/
+pulled-apks/
+scratchpad/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local tooling / editor
+.claude/
+.vscode/
+.idea/
+*.swp
+.DS_Store
