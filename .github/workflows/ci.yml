@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  yara:
+    name: YARA rules compile & regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install YARA
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yara
+          yara --version
+
+      - name: Compile rules
+        run: |
+          # Compiling against /dev/null parses & compiles every rule without
+          # a scan target; any syntax error fails the build.
+          yara gtv-malware.yar /dev/null
+          echo "✅ all rules compiled"
+
+      - name: Regression — positive samples must match
+        run: |
+          set -e
+          printf '/system/xbin/vo1d\nmeiboot.com\n' > pos_vo1d.txt
+          printf 'com.hs.app\nlibanl.so\nfoo.p.jar\nfoo.p.oat\n' > pos_badbox.txt
+          printf 'honeygain.com\npopanet\n' > pos_proxy.txt
+
+          yara gtv-malware.yar pos_vo1d.txt   | grep -q AndroidTV_Vo1d_Backdoor
+          yara gtv-malware.yar pos_badbox.txt | grep -q AndroidTV_BADBOX_Loader
+          yara gtv-malware.yar pos_proxy.txt  | grep -q AndroidTV_Proxyware_PEACHPIT
+          echo "✅ positive samples matched"
+
+      - name: Regression — public blocklist must NOT match
+        run: |
+          set -e
+          # A StevenBlack-style hosts blocklist bundles bad domains to BLOCK them;
+          # the domain rules must ignore it.
+          {
+            echo "# Title: StevenBlack/hosts"
+            for i in $(seq 1 40); do echo "0.0.0.0 badsite$i.example"; done
+            echo "0.0.0.0 meiboot.com"
+            echo "0.0.0.0 flyermobi.com"
+          } > blocklist_hosts.txt
+
+          if yara gtv-malware.yar blocklist_hosts.txt | grep -q .; then
+            echo "❌ FALSE POSITIVE: a rule matched a public blocklist"
+            yara gtv-malware.yar blocklist_hosts.txt
+            exit 1
+          fi
+          echo "✅ blocklist correctly ignored"
+
+  python:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Compile (stdlib only — no install step)
+        run: |
+          python -m py_compile gtv-triage.py
+          echo "✅ gtv-triage.py compiles"

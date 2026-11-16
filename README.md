@@ -6,6 +6,7 @@
 
 **Hunt BADBOX, BADBOX 2.0, and Android.Vo1d on off-brand streaming boxes — no root, no cloud, pure Python stdlib.**
 
+[![CI](https://github.com/crash101g/gtv-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/crash101g/gtv-triage/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-work_in_progress-orange)
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![root](https://img.shields.io/badge/root-not_required-brightgreen)
