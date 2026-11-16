@@ -32,6 +32,8 @@ installed outside the official store.
 - **Export / share** the full report as plain text — ACTION_SEND with a FileProvider
   attachment, degrading to clipboard + an `adb pull`-able file when a TV has no share
   target
+- Optional **VirusTotal API** mode — enter a key (⚙, stored app-private) and query
+  live detection counts (`malicious / total engines`) per hash, on demand
 
 ## What it deliberately does NOT do (this tier)
 
@@ -89,6 +91,8 @@ android/
         PersistenceSweep.kt        boot receivers, a11y, notif, admins, IMEs
         YaraEngine.kt              YARA-subset parser + APK (zip-entry) scanner
         ReportFormatter.kt         plain-text report (summary.txt analogue)
+        VirusTotalClient.kt        VT API v3 file-hash lookup (on demand)
+        ApiKeyStore.kt             app-private VirusTotal API-key storage
         Scoring.kt                 severity-gated 0–100 score
         TriageEngine.kt            orchestrates the above
       ui/
@@ -103,7 +107,8 @@ android/
 - [x] Tappable VirusTotal links (QR to scan with a phone + open-in-browser fallback)
 - [x] On-device YARA (pure-Kotlin matcher for the rules' string/condition subset)
 - [x] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts + device admins
-- [ ] Optional **VirusTotal API** mode (enter key, show detection counts)
+- [x] Optional **VirusTotal API** mode (enter key, show detection counts on demand)
+- [ ] Harden key storage with EncryptedSharedPreferences (androidx.security)
 - [x] Export / share the report (plain-text, ACTION_SEND + clipboard/file fallback)
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)
 - [ ] Proper TV banner artwork + Compose-for-TV focus polish

@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,19 +32,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crash101g.gtvtriage.core.ApiKeyStore
 import com.crash101g.gtvtriage.core.AppEntry
 import com.crash101g.gtvtriage.core.PersistenceReport
 import com.crash101g.gtvtriage.core.TriageReport
+import com.crash101g.gtvtriage.core.VirusTotalClient
+import com.crash101g.gtvtriage.core.VirusTotalClient.VtResult
+import kotlinx.coroutines.launch
 
 private val Bg = Color(0xFF1E2127)
 private val Green = Color(0xFF4EC9B0)
@@ -90,9 +97,13 @@ private fun Loading() {
 @Composable
 private fun Report(report: TriageReport) {
     var vtApp by remember { mutableStateOf<AppEntry?>(null) }
+    var showKeyDialog by remember { mutableStateOf(false) }
 
     vtApp?.let { app ->
         VirusTotalDialog(app, onDismiss = { vtApp = null })
+    }
+    if (showKeyDialog) {
+        ApiKeyDialog(onDismiss = { showKeyDialog = false })
     }
 
     val context = LocalContext.current
@@ -107,6 +118,10 @@ private fun Report(report: TriageReport) {
             Spacer(Modifier.width(12.dp))
             Text("grade ${report.grade}", color = gradeColor, fontSize = 18.sp)
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = { showKeyDialog = true }) {
+                Text("⚙ VT key", color = Dim)
+            }
+            Spacer(Modifier.width(8.dp))
             Button(onClick = { ReportShare.share(context, report) }) {
                 Text("Export / Share")
             }
@@ -185,6 +200,67 @@ private fun PersistenceCard(p: PersistenceReport) {
 }
 
 @Composable
+private fun VtResultText(r: VtResult) {
+    when (r) {
+        is VtResult.Found -> {
+            val bad = r.flagged > 0
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "${r.malicious} malicious / ${r.engines} engines",
+                    color = if (bad) Red else Green,
+                    fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                )
+                Text(
+                    "suspicious ${r.suspicious} • harmless ${r.harmless} • undetected ${r.undetected}",
+                    color = Dim, fontSize = 11.sp,
+                )
+            }
+        }
+        VtResult.NotFound -> Text("VirusTotal has no record of this hash.", color = Yellow, fontSize = 12.sp)
+        VtResult.Unauthorized -> Text("API key rejected (401) — check the key.", color = Red, fontSize = 12.sp)
+        VtResult.RateLimited -> Text("Rate limited (429) — try again in a minute.", color = Yellow, fontSize = 12.sp)
+        is VtResult.Error -> Text("Lookup failed: ${r.message}", color = Red, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ApiKeyDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var key by remember { mutableStateOf(ApiKeyStore.get(context) ?: "") }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(Modifier.width(440.dp).border(1.dp, Dim.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
+            Column(Modifier.background(Color(0xFF14171C)).padding(20.dp)) {
+                Text("VirusTotal API key", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    "Stored locally (app-private). Only file hashes are ever sent, " +
+                        "and only when you press “Check detections”.",
+                    color = Dim, fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = key,
+                    onValueChange = { key = it },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = {
+                        if (key.isBlank()) ApiKeyStore.clear(context) else ApiKeyStore.set(context, key)
+                        onDismiss()
+                    }) { Text("Save") }
+                    TextButton(onClick = {
+                        ApiKeyStore.clear(context); onDismiss()
+                    }) { Text("Clear", color = Dim) }
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = Dim) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PersistLine(label: String, value: String, warn: Boolean) {
     val c = if (warn) Red else Dim
     Row(Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
@@ -251,8 +327,12 @@ private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
 private fun VirusTotalDialog(app: AppEntry, onDismiss: () -> Unit) {
     val url = app.virusTotalUrl ?: return
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val qr = remember(url) { QrCodes.encode(url, 512) }
     var noBrowser by remember { mutableStateOf(false) }
+    val apiKey = remember { ApiKeyStore.get(context) }
+    var vt by remember { mutableStateOf<VtResult?>(null) }
+    var vtLoading by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(Modifier.width(420.dp).border(1.dp, Dim.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
@@ -293,6 +373,29 @@ private fun VirusTotalDialog(app: AppEntry, onDismiss: () -> Unit) {
                         "No browser on this device — scan the QR code instead.",
                         color = Yellow, fontSize = 12.sp,
                     )
+                }
+
+                // Optional API enrichment (only when a key is configured).
+                Spacer(Modifier.height(10.dp))
+                when {
+                    apiKey == null -> Text(
+                        "Tip: add a VirusTotal API key (⚙) to show detections here.",
+                        color = Dim, fontSize = 11.sp,
+                    )
+                    vtLoading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(color = Green, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Querying VirusTotal…", color = Dim, fontSize = 12.sp)
+                    }
+                    vt != null -> VtResultText(vt!!)
+                    else -> TextButton(onClick = {
+                        val sha = app.sha256 ?: return@TextButton
+                        vtLoading = true
+                        scope.launch {
+                            vt = VirusTotalClient.lookup(sha, apiKey)
+                            vtLoading = false
+                        }
+                    }) { Text("Check detections via API", color = Color(0xFF569CD6)) }
                 }
 
                 Spacer(Modifier.height(16.dp))
