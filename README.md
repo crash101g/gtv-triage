@@ -69,6 +69,10 @@ evidence to confirm every flag by hand.
 
 ![yara scan](assets/yara-scan.svg)
 
+**Vets every app you installed outside the Play Store — IOC, YARA and VirusTotal at a glance:**
+
+![sideload vetting](assets/sideload-vetting.svg)
+
 ---
 
 ## ✨ Features
@@ -112,6 +116,8 @@ yara -r gtv-malware.yar ./pulled-apks/
 
 Installed something from outside the Play Store and want a second opinion? This is the
 path:
+
+![sideload vetting](assets/sideload-vetting.svg)
 
 ```bash
 # Triage + IOC match + clickable VirusTotal links for anything suspicious — no key needed
