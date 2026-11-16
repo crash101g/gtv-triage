@@ -73,6 +73,12 @@ evidence to confirm every flag by hand.
 
 ![sideload vetting](assets/sideload-vetting.svg)
 
+> **Screenshots render natively on GitHub.** They are self-contained **static SVGs**
+> (only `<rect>`/`<circle>`/`<text>` — no scripts, external fonts, or animation), the
+> category GitHub's SVG sanitizer renders reliably. Verified served from GitHub's own
+> `/raw/main/assets/*.svg` path (not the camo proxy) as `image/svg+xml`, HTTP 200.
+> Device IP and APK hashes shown are sanitized/truncated — no real device data.
+
 ---
 
 ## ✨ Features
