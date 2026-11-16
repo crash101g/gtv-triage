@@ -194,12 +194,14 @@ apps worth a look).
   boxes**, per Google — a certified device is very unlikely to ship with them. The
   *sideload-vetting* use case applies to **every** Android TV / Google TV device,
   certified or not, because sideloading bypasses Play Protect regardless of brand.
-- **Fire OS aware.** On Amazon Fire TV (which has no Play Store) the tool auto-detects
-  Fire OS and treats the **Amazon Appstore / Amazon-signed updaters** as a trusted store,
-  so only *genuinely* sideloaded apps (Downloader, APK mirrors, `null` installer) are
-  flagged — and Amazon system listeners aren't mislabeled as non-standard. Discovery
-  finds a Fire Stick via the ADB port-5555 sweep (it doesn't announce Google Cast), or
-  just use `--device <ip>:5555`.
+- **Fire OS aware** *(implemented; not yet validated on real Fire TV hardware)*. On
+  Amazon Fire TV (which has no Play Store) the tool auto-detects Fire OS and treats the
+  **Amazon Appstore / Amazon-signed updaters** as a trusted store, so only *genuinely*
+  sideloaded apps (Downloader, APK mirrors, `null` installer) are flagged — and Amazon
+  system listeners aren't mislabeled as non-standard. Discovery finds a Fire Stick via
+  the ADB port-5555 sweep (it doesn't announce Google Cast), or just use
+  `--device <ip>:5555`. Logic is unit-tested against simulated Fire OS properties; a
+  run against a physical Fire TV Stick is the next validation step.
 
 ---
 
