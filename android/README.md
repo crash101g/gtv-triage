@@ -39,11 +39,19 @@ installed outside the official store.
 
 ## Validation status
 
-**Built, installed and run on a real onn. 4K Pro** (jarvis2, Android 14): the app
-compiles (Gradle 8.9 / AGP 8.5.2 / SDK 34), launches on the TV, completes a scan,
-and renders the full report — and its verdict **matches the validated ADB tool
-exactly: 85/100, grade B, 0 IOC, 0 YARA**. D-pad focus, the persistence card, and
-the per-app cards (hash + VirusTotal prompt) all work on-device.
+**Built, installed and run on two real devices** — an **onn. 4K Pro** (jarvis2) and
+a **TCL Smart TV** (G13_2K_US), both Android 14. The app compiles (Gradle 8.9 /
+AGP 8.5.2 / SDK 34), launches, completes a scan, and renders the full report;
+D-pad focus, the persistence card, and the per-app cards (hash + VirusTotal prompt)
+all work on-device. Both scored **85/100, grade B, 0 IOC, 0 YARA** (clean), and the
+checker correctly excludes itself from the sideloaded list.
+
+- On the **onn**, the app's verdict matched the ADB tool exactly (85/B).
+- On the **TCL**, the ADB tool scored 35/E because it flagged `ro.boot.flash.locked`
+  unset (HIGH) and a non-empty `/data/local/tmp` (MEDIUM) — firmware/filesystem
+  signals that need the shell uid. A sandboxed app can't read either, so it reports
+  on its actual scope (sideloaded apps + persistence + YARA/IOC) and lands at 85/B.
+  This is the expected, honest boundary of the non-root tier, not a miss.
 
 Two issues were found and fixed by that on-hardware run:
 - **Self-detection** — the app bundles the YARA rules + IOC feed as assets, so
@@ -70,7 +78,7 @@ Earlier, before the on-device run, the core logic had also been validated:
     catches strings that raw-byte `yara file.apk` misses inside compressed DEX.)
 
 Still pending: a run on an actual **Fire TV Stick** (Fire OS paths are implemented
-and unit-logic-tested, not yet hardware-run), and on a **TCL** Google TV set.
+and unit-logic-tested, not yet hardware-run).
 
 ## What it deliberately does NOT do (this tier)
 
@@ -150,5 +158,5 @@ android/
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)
 - [x] Proper TV banner artwork (320×180) + D-pad focus polish (focus highlight +
       scale, initial focus on the action bar)
-- [x] Real-device validation on an **onn. 4K Pro** — built, installed, scanned,
-      verdict matches the ADB tool (85/B). Fire TV Stick + TCL still to do.
+- [x] Real-device validation on an **onn. 4K Pro** and a **TCL Smart TV** — built,
+      installed, scanned, both clean (85/B). Fire TV Stick still to do.
