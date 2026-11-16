@@ -16,15 +16,21 @@ installed outside the official store.
 - Computes the **SHA-256** of each third-party APK
 - Substring-matches every app against the bundled **`gtv-iocs.txt`** feed
 - Best-effort **firmware integrity** (build tags, test-keys, verified boot, SELinux)
+- **Persistence-lite** sweep (no root): BOOT_COMPLETED / LOCKED_BOOT receivers,
+  enabled accessibility services, notification listeners, active device-admin
+  components, and enabled IMEs (with the default flagged) — accessibility, device
+  admins and third-party IMEs are surfaced as review flags
 - Produces the same **severity-gated 0–100 score / grade / verdict**
 - Shows a TV screen: score header + per-app cards (sideloaded / IOC / store), each
   with its hash and a **VirusTotal link**
 
 ## What it deliberately does NOT do (this tier)
 
-A sandboxed app can't see system-wide processes, listening sockets, or run
-`dumpsys` (needs root or the `shell` uid). Those live in the ADB tool and would
-require a **Shizuku** or root bridge — planned as a separate optional mode.
+A sandboxed app can't see system-wide processes, listening sockets, native init
+services, or run `dumpsys` job/alarm dumps (needs root or the `shell` uid). Those
+live in the ADB tool and would require a **Shizuku** or root bridge — planned as a
+separate optional mode. The persistence-lite sweep above covers the footholds that
+*are* reachable from the sandbox.
 
 ## Build & run
 
@@ -70,6 +76,7 @@ android/
         ApkHasher.kt               SHA-256 of APKs
         IocMatcher.kt              substring IOC matcher (bundled feed)
         FirmwareIntegrity.kt       Build / SystemProperties / SELinux checks
+        PersistenceSweep.kt        boot receivers, a11y, notif, admins, IMEs
         Scoring.kt                 severity-gated 0–100 score
         TriageEngine.kt            orchestrates the above
       ui/
@@ -81,7 +88,7 @@ android/
 
 - [ ] Tappable VirusTotal links (open in browser / show QR for TV)
 - [ ] On-device YARA (bundle `libyara` via NDK, or port the rules to a matcher)
-- [ ] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts
+- [x] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts + device admins
 - [ ] Optional **VirusTotal API** mode (enter key, show detection counts)
 - [ ] Export / share the report
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)

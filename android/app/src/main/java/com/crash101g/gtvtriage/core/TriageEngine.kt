@@ -19,7 +19,10 @@ class TriageEngine(private val context: Context) {
         val fireOs = InstallerClassifier.isFireOs()
         val ioc = IocMatcher.fromAsset(context)
 
-        val apps = PackageInventory(context).collect().map { raw ->
+        val rawApps = PackageInventory(context).collect()
+        val systemPackages = rawApps.filter { it.isSystem }.map { it.packageName }.toSet()
+
+        val apps = rawApps.map { raw ->
             val sideloaded = !raw.isSystem &&
                 !InstallerClassifier.isStoreInstaller(raw.installer, fireOs)
             // Hash third-party apps (sideloaded first-class, store apps for reference).
@@ -42,8 +45,9 @@ class TriageEngine(private val context: Context) {
         )
 
         val firmware = FirmwareIntegrity.checks()
+        val persistence = PersistenceSweep(context, systemPackages).run()
 
-        val findings = buildFindings(firmware, apps, fireOs)
+        val findings = buildFindings(firmware, apps, persistence, fireOs)
         val scored = Scoring.score(findings)
 
         val label = "${Build.MANUFACTURER} ${Build.MODEL}" +
@@ -54,6 +58,7 @@ class TriageEngine(private val context: Context) {
             fireOs = fireOs,
             firmware = firmware,
             apps = apps,
+            persistence = persistence,
             findings = findings,
             score = scored.score,
             grade = scored.grade,
@@ -64,6 +69,7 @@ class TriageEngine(private val context: Context) {
     private fun buildFindings(
         firmware: List<FirmwareCheck>,
         apps: List<AppEntry>,
+        persistence: PersistenceReport,
         fireOs: Boolean,
     ): List<Finding> {
         val findings = mutableListOf<Finding>()
@@ -85,6 +91,26 @@ class TriageEngine(private val context: Context) {
             for (hit in app.iocHits) {
                 findings += Finding(Severity.HIGH, "IOC '$hit' matched ${app.packageName}")
             }
+        }
+
+        // Persistence findings — same severities as the ADB tool's scorer.
+        // Accessibility + device admin are genuine high-value footholds; third-party
+        // boot receivers are ubiquitous on media boxes, so they score as a single
+        // low-weight attack-surface note, not per-item.
+        for (svc in persistence.accessibility) {
+            findings += Finding(Severity.HIGH, "accessibility service enabled: ${svc.component}")
+        }
+        for (admin in persistence.deviceAdmins) {
+            findings += Finding(Severity.HIGH, "device admin / policy component: ${admin.component}")
+        }
+        val tpBoot = persistence.thirdPartyBootReceivers.size
+        if (tpBoot > 0) {
+            findings += Finding(Severity.LOW, "$tpBoot third-party boot receiver(s) (normal for media apps)")
+        }
+        // A sideloaded IME can keylog everything typed on the TV — worth a MEDIUM
+        // review flag (the ADB tool records it as a note; on-device we surface it).
+        for (ime in persistence.inputMethods.filter { it.thirdParty }) {
+            findings += Finding(Severity.MEDIUM, "third-party input method enabled: ${ime.component}")
         }
         return findings
     }

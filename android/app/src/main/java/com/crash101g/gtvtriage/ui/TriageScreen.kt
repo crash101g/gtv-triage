@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crash101g.gtvtriage.core.AppEntry
+import com.crash101g.gtvtriage.core.PersistenceReport
 import com.crash101g.gtvtriage.core.TriageReport
 
 private val Bg = Color(0xFF1E2127)
@@ -94,10 +95,75 @@ private fun Report(report: TriageReport) {
         Spacer(Modifier.padding(8.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            item(key = "__persistence") { PersistenceCard(report.persistence) }
+            item(key = "__apps_header") {
+                Text(
+                    "Installed apps",
+                    color = Dim, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                )
+            }
             items(report.apps, key = { it.packageName }) { app ->
                 AppRow(app)
             }
         }
+    }
+}
+
+@Composable
+private fun PersistenceCard(p: PersistenceReport) {
+    val hasHigh = p.accessibility.isNotEmpty() || p.deviceAdmins.isNotEmpty()
+    val accent = if (hasHigh) Red else Dim
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Persistence", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(
+                "non-root view: boot receivers, a11y, notif listeners, device admins, IMEs",
+                color = Dim, fontSize = 11.sp,
+            )
+            Spacer(Modifier.padding(3.dp))
+
+            PersistLine(
+                "Boot receivers",
+                "${p.bootReceiverTotal} total • ${p.thirdPartyBootReceivers.size} third-party",
+                warn = false,
+            )
+            p.accessibility.forEach {
+                PersistLine("⚠ Accessibility", it.component, warn = true)
+            }
+            if (p.accessibility.isEmpty()) {
+                PersistLine("Accessibility", "none enabled", warn = false)
+            }
+            p.deviceAdmins.forEach {
+                PersistLine("⚠ Device admin", it.component, warn = true)
+            }
+            p.notificationListeners.forEach {
+                PersistLine("Notif listener", it.component, warn = it.thirdParty)
+            }
+            p.inputMethods.forEach {
+                val tag = buildString {
+                    append(it.component)
+                    if (it.isDefault) append("  (default)")
+                }
+                PersistLine(
+                    if (it.thirdParty) "⚠ Input method" else "Input method",
+                    tag, warn = it.thirdParty,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersistLine(label: String, value: String, warn: Boolean) {
+    val c = if (warn) Red else Dim
+    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+        Text(label, color = c, fontSize = 12.sp, modifier = Modifier.width(140.dp))
+        Text(value, color = if (warn) Red else Color(0xFFBFC5CB), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
