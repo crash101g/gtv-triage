@@ -22,7 +22,9 @@ installed outside the official store.
   admins and third-party IMEs are surfaced as review flags
 - Produces the same **severity-gated 0–100 score / grade / verdict**
 - Shows a TV screen: score header + per-app cards (sideloaded / IOC / store), each
-  with its hash and a **VirusTotal link**
+  with its hash and a **tappable VirusTotal link** — D-pad-select any app to open a
+  dialog with a **scannable QR code** (TVs rarely have a browser) plus an
+  *Open in browser* fallback
 
 ## What it deliberately does NOT do (this tier)
 
@@ -81,12 +83,13 @@ android/
         TriageEngine.kt            orchestrates the above
       ui/
         TriageViewModel.kt         runs the scan off the main thread
-        TriageScreen.kt            score header + app-list cards
+        TriageScreen.kt            score header + app-list cards + VT dialog
+        QrCodes.kt                 ZXing QR encoder for VirusTotal links
 ```
 
 ## Roadmap
 
-- [ ] Tappable VirusTotal links (open in browser / show QR for TV)
+- [x] Tappable VirusTotal links (QR to scan with a phone + open-in-browser fallback)
 - [ ] On-device YARA (bundle `libyara` via NDK, or port the rules to a matcher)
 - [x] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts + device admins
 - [ ] Optional **VirusTotal API** mode (enter key, show detection counts)

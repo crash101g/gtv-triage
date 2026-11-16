@@ -1,30 +1,45 @@
 package com.crash101g.gtvtriage.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crash101g.gtvtriage.core.AppEntry
 import com.crash101g.gtvtriage.core.PersistenceReport
@@ -74,6 +89,12 @@ private fun Loading() {
 
 @Composable
 private fun Report(report: TriageReport) {
+    var vtApp by remember { mutableStateOf<AppEntry?>(null) }
+
+    vtApp?.let { app ->
+        VirusTotalDialog(app, onDismiss = { vtApp = null })
+    }
+
     val gradeColor = when (report.grade) {
         "A", "B" -> Green
         "C", "D" -> Yellow
@@ -104,7 +125,7 @@ private fun Report(report: TriageReport) {
                 )
             }
             items(report.apps, key = { it.packageName }) { app ->
-                AppRow(app)
+                AppRow(app, onOpenVt = { if (app.virusTotalUrl != null) vtApp = app })
             }
         }
     }
@@ -168,16 +189,18 @@ private fun PersistLine(label: String, value: String, warn: Boolean) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry) {
+private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
     val accent = when {
         app.iocHits.isNotEmpty() -> Red
         app.sideloaded -> Yellow
         else -> Dim
     }
+    val hasVt = app.virusTotalUrl != null
     Card(
         Modifier
             .fillMaxWidth()
-            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .then(if (hasVt) Modifier.clickable { onOpenVt() } else Modifier),
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -201,7 +224,82 @@ private fun AppRow(app: AppEntry) {
                 Text("⚠ matched: ${app.iocHits.joinToString(", ")}", color = Red, fontSize = 12.sp)
             }
             app.virusTotalUrl?.let {
-                Text(it, color = Color(0xFF569CD6), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    "▶ Press to check on VirusTotal (QR / browser)",
+                    color = Color(0xFF569CD6), fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * VirusTotal link dialog. On a TV there's usually no browser and only a D-pad, so
+ * the primary path is a QR code to scan with a phone. An "Open in browser" button
+ * covers devices that do have one (and degrades to a helpful message if they don't).
+ */
+@Composable
+private fun VirusTotalDialog(app: AppEntry, onDismiss: () -> Unit) {
+    val url = app.virusTotalUrl ?: return
+    val context = LocalContext.current
+    val qr = remember(url) { QrCodes.encode(url, 512) }
+    var noBrowser by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(Modifier.width(420.dp).border(1.dp, Dim.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
+            Column(
+                Modifier.background(Color(0xFF14171C)).padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(app.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("VirusTotal lookup", color = Dim, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+
+                if (qr != null) {
+                    Image(
+                        bitmap = qr,
+                        contentDescription = "VirusTotal QR code",
+                        modifier = Modifier
+                            .size(220.dp)
+                            .background(Color.White)
+                            .padding(8.dp),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text("Scan with your phone", color = Dim, fontSize = 12.sp)
+                } else {
+                    Text("Could not render QR — use the URL below.", color = Yellow, fontSize = 12.sp)
+                }
+
+                Spacer(Modifier.height(10.dp))
+                app.sha256?.let {
+                    Text("sha256", color = Dim, fontSize = 10.sp)
+                    Text(it, color = Color(0xFFBFC5CB), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Text(url, color = Color(0xFF569CD6), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+
+                if (noBrowser) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No browser on this device — scan the QR code instead.",
+                        color = Yellow, fontSize = 12.sp,
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        } catch (e: ActivityNotFoundException) {
+                            noBrowser = true
+                        }
+                    }) { Text("Open in browser") }
+                    TextButton(onClick = onDismiss) { Text("Close", color = Dim) }
+                }
             }
         }
     }

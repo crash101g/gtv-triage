@@ -62,5 +62,9 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // QR generation for the VirusTotal link dialog — most TVs have no browser, so
+    // the primary path is "scan this with your phone." Pure-Java, no Play services.
+    implementation("com.google.zxing:core:3.5.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
