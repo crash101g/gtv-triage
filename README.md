@@ -20,7 +20,8 @@
 > IOC and YARA engines work and have been validated against a real retail device —
 > but detection content, scoring weights, and VirusTotal automation are still
 > evolving. Treat every result as a **lead for a human analyst**, not a verdict.
-> Expect breaking changes. Feedback and IOC contributions welcome.
+> Expect breaking changes. Feedback and IOC contributions welcome — see
+> [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -190,6 +191,15 @@ apps worth a look).
 - **Android.Vo1d** — [Doctor Web](https://github.com/DoctorWebLtd/malware-iocs/tree/master/Android.Vo1d)
 - **Original BADBOX / T95** — [DesktopECHO/T95-H616-Malware](https://github.com/DesktopECHO/T95-H616-Malware)
 - **FBI IC3** — BADBOX 2.0 public service announcement (2025)
+
+---
+
+## 🤝 Contributing
+
+🚧 This is a work in progress and contributions are welcome — especially **fresh IOCs**
+and **YARA tuning**. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to add indicators,
+write rules that survive CI, and the pre-PR checks. New indicators must come with a
+public source, and never include real device data (serials, IPs, app lists) in a PR.
 
 ---
 
