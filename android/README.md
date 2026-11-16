@@ -25,10 +25,13 @@ installed outside the official store.
   components, and enabled IMEs (with the default flagged) — accessibility, device
   admins and third-party IMEs are surfaced as review flags
 - Produces the same **severity-gated 0–100 score / grade / verdict**
-- Shows a TV screen: score header + per-app cards (sideloaded / IOC / store), each
-  with its hash and a **tappable VirusTotal link** — D-pad-select any app to open a
-  dialog with a **scannable QR code** (TVs rarely have a browser) plus an
+- Shows a TV screen: score header + per-app cards (sideloaded / IOC / YARA / store),
+  each with its hash and a **tappable VirusTotal link** — D-pad-select any app to open
+  a dialog with a **scannable QR code** (TVs rarely have a browser) plus an
   *Open in browser* fallback
+- **Export / share** the full report as plain text — ACTION_SEND with a FileProvider
+  attachment, degrading to clipboard + an `adb pull`-able file when a TV has no share
+  target
 
 ## What it deliberately does NOT do (this tier)
 
@@ -85,12 +88,14 @@ android/
         FirmwareIntegrity.kt       Build / SystemProperties / SELinux checks
         PersistenceSweep.kt        boot receivers, a11y, notif, admins, IMEs
         YaraEngine.kt              YARA-subset parser + APK (zip-entry) scanner
+        ReportFormatter.kt         plain-text report (summary.txt analogue)
         Scoring.kt                 severity-gated 0–100 score
         TriageEngine.kt            orchestrates the above
       ui/
         TriageViewModel.kt         runs the scan off the main thread
         TriageScreen.kt            score header + app-list cards + VT dialog
         QrCodes.kt                 ZXing QR encoder for VirusTotal links
+        ReportShare.kt             ACTION_SEND export + clipboard/file fallback
 ```
 
 ## Roadmap
@@ -99,7 +104,7 @@ android/
 - [x] On-device YARA (pure-Kotlin matcher for the rules' string/condition subset)
 - [x] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts + device admins
 - [ ] Optional **VirusTotal API** mode (enter key, show detection counts)
-- [ ] Export / share the report
+- [x] Export / share the report (plain-text, ACTION_SEND + clipboard/file fallback)
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)
 - [ ] Proper TV banner artwork + Compose-for-TV focus polish
 - [ ] Real-device validation (onn. 4K Pro + Fire TV Stick)

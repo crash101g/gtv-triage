@@ -95,6 +95,7 @@ private fun Report(report: TriageReport) {
         VirusTotalDialog(app, onDismiss = { vtApp = null })
     }
 
+    val context = LocalContext.current
     val gradeColor = when (report.grade) {
         "A", "B" -> Green
         "C", "D" -> Yellow
@@ -105,6 +106,10 @@ private fun Report(report: TriageReport) {
             Text("${report.score}/100", color = gradeColor, fontSize = 34.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(12.dp))
             Text("grade ${report.grade}", color = gradeColor, fontSize = 18.sp)
+            Spacer(Modifier.weight(1f))
+            Button(onClick = { ReportShare.share(context, report) }) {
+                Text("Export / Share")
+            }
         }
         Text(report.verdict, color = Color.White, fontSize = 15.sp)
         Text(report.deviceLabel, color = Dim, fontSize = 13.sp)

@@ -169,8 +169,9 @@ app that runs the *plain sideload-vetting* tier **directly on the TV**, no PC/AD
 It ports the core logic to Kotlin (package inventory, installer attribution incl. Fire
 OS, APK hashing, IOC matching, **on-device YARA** over each APK's decompressed entries,
 a non-root **persistence-lite** sweep — boot receivers, accessibility services,
-notification listeners, device admins, IMEs — tappable **VirusTotal** links via QR, and
-severity-gated scoring) with a Compose-for-TV screen.
+notification listeners, device admins, IMEs — tappable **VirusTotal** links via QR,
+**export/share** of a plain-text report, and severity-gated scoring) with a
+Compose-for-TV screen.
 System-wide process/socket/`dumpsys` depth stays in the ADB tool (needs Shizuku/root).
 See [android/README.md](android/README.md) for build/run and roadmap.
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- cacheDir/reports -> shared via FileProvider as the report attachment. -->
+    <cache-path name="reports" path="reports/" />
+    <!-- external files dir -> adb-pullable fallback copy. -->
+    <external-files-path name="external" path="." />
+</paths>
