@@ -18,6 +18,11 @@ class TriageEngine(private val context: Context) {
     suspend fun run(): TriageReport = withContext(Dispatchers.Default) {
         val fireOs = InstallerClassifier.isFireOs()
         val ioc = IocMatcher.fromAsset(context)
+        val yara = try {
+            YaraEngine.fromAsset(context)
+        } catch (e: Exception) {
+            null // never let a rules-load failure sink the whole scan
+        }
 
         val rawApps = PackageInventory(context).collect()
         val systemPackages = rawApps.filter { it.isSystem }.map { it.packageName }.toSet()
@@ -28,6 +33,9 @@ class TriageEngine(private val context: Context) {
             // Hash third-party apps (sideloaded first-class, store apps for reference).
             val sha = if (!raw.isSystem) ApkHasher.sha256(raw.sourceDir) else null
             val hits = ioc.match(raw.packageName, raw.installer, raw.sourceDir)
+            // YARA-scan the same third-party set we hash (scanning every system app
+            // would be slow and low-yield). Decompresses the APK's ZIP entries.
+            val yaraHits = if (!raw.isSystem) yara?.scanApk(raw.sourceDir).orEmpty() else emptyList()
             AppEntry(
                 packageName = raw.packageName,
                 label = raw.label,
@@ -37,9 +45,11 @@ class TriageEngine(private val context: Context) {
                 sideloaded = sideloaded,
                 sha256 = sha,
                 iocHits = hits,
+                yaraHits = yaraHits,
             )
         }.sortedWith(
-            compareByDescending<AppEntry> { it.iocHits.isNotEmpty() }
+            compareByDescending<AppEntry> { it.yaraHits.isNotEmpty() }
+                .thenByDescending { it.iocHits.isNotEmpty() }
                 .thenByDescending { it.sideloaded }
                 .thenBy { it.label.lowercase() },
         )
@@ -90,6 +100,16 @@ class TriageEngine(private val context: Context) {
         for (app in apps) {
             for (hit in app.iocHits) {
                 findings += Finding(Severity.HIGH, "IOC '$hit' matched ${app.packageName}")
+            }
+            // YARA: BADBOX/Vo1d backdoor rules are CRITICAL; the dual-use proxyware
+            // rule is explicitly "review, not proof" per its own note -> MEDIUM.
+            for (rule in app.yaraHits) {
+                val sev = if (rule.contains("Proxyware", ignoreCase = true)) {
+                    Severity.MEDIUM
+                } else {
+                    Severity.CRITICAL
+                }
+                findings += Finding(sev, "YARA rule '$rule' matched ${app.packageName}")
             }
         }
 

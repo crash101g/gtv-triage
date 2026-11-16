@@ -110,7 +110,7 @@ private fun Report(report: TriageReport) {
         Text(report.deviceLabel, color = Dim, fontSize = 13.sp)
         Text(
             "${report.apps.size} apps • ${report.sideloadedApps.size} sideloaded • " +
-                "${report.iocFlaggedApps.size} IOC-flagged",
+                "${report.iocFlaggedApps.size} IOC • ${report.yaraFlaggedApps.size} YARA",
             color = Dim, fontSize = 13.sp,
         )
         Spacer(Modifier.padding(8.dp))
@@ -191,7 +191,7 @@ private fun PersistLine(label: String, value: String, warn: Boolean) {
 @Composable
 private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
     val accent = when {
-        app.iocHits.isNotEmpty() -> Red
+        app.yaraHits.isNotEmpty() || app.iocHits.isNotEmpty() -> Red
         app.sideloaded -> Yellow
         else -> Dim
     }
@@ -207,6 +207,7 @@ private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
                 Text(app.label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 15.sp)
                 Text(
                     when {
+                        app.yaraHits.isNotEmpty() -> "YARA"
                         app.iocHits.isNotEmpty() -> "IOC"
                         app.sideloaded -> "SIDELOADED"
                         app.isSystem -> "system"
@@ -220,8 +221,11 @@ private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
             app.sha256?.let {
                 Text("sha256: ${it.take(16)}…", color = Dim, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
             }
+            if (app.yaraHits.isNotEmpty()) {
+                Text("☣ YARA: ${app.yaraHits.joinToString(", ")}", color = Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
             if (app.iocHits.isNotEmpty()) {
-                Text("⚠ matched: ${app.iocHits.joinToString(", ")}", color = Red, fontSize = 12.sp)
+                Text("⚠ IOC: ${app.iocHits.joinToString(", ")}", color = Red, fontSize = 12.sp)
             }
             app.virusTotalUrl?.let {
                 Text(

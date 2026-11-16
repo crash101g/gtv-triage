@@ -15,6 +15,10 @@ installed outside the official store.
   Fire OS, Google Play everywhere) — to flag genuinely **sideloaded** apps
 - Computes the **SHA-256** of each third-party APK
 - Substring-matches every app against the bundled **`gtv-iocs.txt`** feed
+- **On-device YARA**: scans each third-party APK's *decompressed* ZIP entries
+  (DEX, `lib/*.so`, manifest, resources) against the bundled **`gtv-malware.yar`**
+  rules — a pure-Kotlin matcher for the rules' string/condition subset (no NDK,
+  no `libyara.so`)
 - Best-effort **firmware integrity** (build tags, test-keys, verified boot, SELinux)
 - **Persistence-lite** sweep (no root): BOOT_COMPLETED / LOCKED_BOOT receivers,
   enabled accessibility services, notification listeners, active device-admin
@@ -69,6 +73,7 @@ android/
   app/src/main/
     AndroidManifest.xml            QUERY_ALL_PACKAGES, LEANBACK launcher
     assets/gtv-iocs.txt            copy of the IOC feed (bundled)
+    assets/gtv-malware.yar         copy of the YARA rules (bundled)
     java/com/crash101g/gtvtriage/
       MainActivity.kt              Compose entry point
       core/
@@ -79,6 +84,7 @@ android/
         IocMatcher.kt              substring IOC matcher (bundled feed)
         FirmwareIntegrity.kt       Build / SystemProperties / SELinux checks
         PersistenceSweep.kt        boot receivers, a11y, notif, admins, IMEs
+        YaraEngine.kt              YARA-subset parser + APK (zip-entry) scanner
         Scoring.kt                 severity-gated 0–100 score
         TriageEngine.kt            orchestrates the above
       ui/
@@ -90,7 +96,7 @@ android/
 ## Roadmap
 
 - [x] Tappable VirusTotal links (QR to scan with a phone + open-in-browser fallback)
-- [ ] On-device YARA (bundle `libyara` via NDK, or port the rules to a matcher)
+- [x] On-device YARA (pure-Kotlin matcher for the rules' string/condition subset)
 - [x] Persistence-lite: boot receivers + `Settings.Secure` a11y/notif/IME readouts + device admins
 - [ ] Optional **VirusTotal API** mode (enter key, show detection counts)
 - [ ] Export / share the report

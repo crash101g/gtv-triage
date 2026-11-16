@@ -25,6 +25,7 @@ data class AppEntry(
     val sideloaded: Boolean,
     val sha256: String?,
     val iocHits: List<String> = emptyList(),
+    val yaraHits: List<String> = emptyList(),
 ) {
     /** VirusTotal GUI link — works in any browser, no API key needed. */
     val virusTotalUrl: String?
@@ -91,4 +92,5 @@ data class TriageReport(
 ) {
     val sideloadedApps: List<AppEntry> get() = apps.filter { it.sideloaded }
     val iocFlaggedApps: List<AppEntry> get() = apps.filter { it.iocHits.isNotEmpty() }
+    val yaraFlaggedApps: List<AppEntry> get() = apps.filter { it.yaraHits.isNotEmpty() }
 }
