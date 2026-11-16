@@ -9,6 +9,15 @@ scratchpad/
 __pycache__/
 *.pyc
 
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+*.iml
+.cxx/
+
 # Local tooling / editor
 .claude/
 .vscode/

@@ -162,6 +162,15 @@ Each run writes to `tv-triage-runs/<timestamp>_<build-id>/`:
 - `summary.txt` — the graded red-flag report
 - `diff.txt` — changes vs. the previous run
 
+### 📱 On-device app (experimental)
+
+[`android/`](android/) holds a 🚧 scaffold of **GTV Sideload Checker** — an Android
+app that runs the *plain sideload-vetting* tier **directly on the TV**, no PC/ADB/root.
+It ports the core logic to Kotlin (package inventory, installer attribution incl. Fire
+OS, APK hashing, IOC matching, severity-gated scoring) with a Compose-for-TV screen.
+System-wide process/socket/`dumpsys` depth stays in the ADB tool (needs Shizuku/root).
+See [android/README.md](android/README.md) for build/run and roadmap.
+
 ---
 
 ## 🧪 Validated against a real device
