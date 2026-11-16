@@ -2,9 +2,9 @@
 
 # 📺 gtv-triage
 
-### Non-root security triage for Android TV & Google TV boxes
+### Non-root security triage for any Android TV & Google TV device
 
-**Hunt BADBOX, BADBOX 2.0, and Android.Vo1d on off-brand streaming boxes — no root, no cloud, pure Python stdlib.**
+**Vet the apps you sideloaded, and hunt BADBOX / BADBOX 2.0 / Android.Vo1d — on any Android TV or Google TV device, no root, no cloud, pure Python stdlib.**
 
 [![CI](https://github.com/crash101g/gtv-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/crash101g/gtv-triage/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-work_in_progress-orange)
@@ -24,17 +24,33 @@
 
 ---
 
-## Why this exists
+## Who it's for
 
-Millions of cheap Android TV boxes ship with **preinstalled malware** — BADBOX,
+`gtv-triage` works on **any** Android TV / Google TV device — a Chromecast with Google
+TV, an onn., a Shield, a TCL/Sony set, or a no-name AOSP box. It answers two questions
+over plain ADB-over-Wi-Fi in about 30 seconds, without rooting, flashing, or sending
+anything to the cloud:
+
+### 1. 🧩 "I sideloaded apps — are any of them sketchy?"
+The moment you install an APK from **outside the Play Store** — Downloader, a GitHub
+release, an APK-mirror site, a forum link — Google Play Protect's review no longer
+applies. That app can ship adware, proxyware ("earn money" SDKs that rent out your
+connection), or an outright backdoor, and nothing on the device tells you. `gtv-triage`
+**inventories every sideloaded app, hashes it, scans it with YARA, matches it against a
+threat-intel IOC feed, and hands you a VirusTotal link for each one** — so you can vet
+what you installed instead of trusting it blindly. This is the everyday use case, and it
+applies to perfectly legitimate, Play-certified devices.
+
+### 2. 🦠 "Is my cheap box one of the infected ones?"
+Millions of off-brand Android TV boxes ship with **preinstalled malware** — BADBOX,
 BADBOX 2.0 (Triada-based), and Android.Vo1d — turning living rooms into residential
 proxy nodes and ad-fraud bots. The FBI issued a [public advisory](https://www.ic3.gov/PSA/2025/PSA250605)
-on BADBOX 2.0 in 2025.
+on BADBOX 2.0 in 2025. Most owners can't root these boxes or install an AV. `gtv-triage`
+checks firmware integrity and sweeps for the known packages, dropped artifacts, native
+libs, and C2 infrastructure of these families.
 
-The problem: most owners can't root these boxes, can't install an AV, and have no
-way to know if their device is one of the infected ones. **`gtv-triage` answers that
-question over plain ADB-over-Wi-Fi in about 30 seconds — without rooting, flashing,
-or sending anything to the cloud.**
+Either way, the output is the same: a **graded, severity-ranked report** plus the raw
+evidence to confirm every flag by hand.
 
 ---
 
@@ -44,7 +60,7 @@ or sending anything to the cloud.**
 
 ![security assessment](assets/scan-verdict.svg)
 
-**Auto-discovers TV boxes on your LAN:**
+**Auto-discovers TV devices on your LAN:**
 
 ![LAN discovery](assets/discovery.svg)
 
@@ -58,7 +74,8 @@ or sending anything to the cloud.**
 
 | | |
 |---|---|
-| 🔍 **LAN auto-discovery** | Finds Android/Google TV boxes via mDNS + Cast + subnet sweep, then connects over ADB |
+| 🔍 **LAN auto-discovery** | Finds Android/Google TV devices via mDNS + Cast + subnet sweep, then connects over ADB |
+| 🧩 **Sideload vetting** | Inventories every non-Play app, hashes it, YARA-scans pulled APKs, and links each to VirusTotal |
 | 🛡️ **Firmware integrity** | Verified boot, bootloader lock, SELinux, release-keys, `ro.debuggable`/`ro.secure` |
 | 🦠 **Known-malware checks** | Vo1d / BADBOX / BADBOX 2.0 packages, dropped artifacts, native libs |
 | 📇 **182-indicator IOC feed** | Packages, paths, 100+ C2 domains, proxyware SDKs — substring-matched, editable |
@@ -90,6 +107,26 @@ or sending anything to the cloud.**
 yara -r gtv-malware.yar ./pulled-apks/
 ```
 
+### 🧩 Vetting sideloaded apps (the everyday workflow)
+
+Installed something from outside the Play Store and want a second opinion? This is the
+path:
+
+```bash
+# Triage + IOC match + clickable VirusTotal links for anything suspicious — no key needed
+./gtv-triage.py --device 192.168.1.50:5555 --ioc gtv-iocs.txt --vt-links
+
+# Pull the non-Play APKs and scan their real contents (unpacked DEX, libs, assets)
+./gtv-triage.py --device 192.168.1.50:5555 --pull-apks new
+yara -r gtv-malware.yar ./pulled-apks/
+```
+
+The run's `summary.txt` lists every **sideloaded / non-Play app** by name, and
+`norm/apk_hashes.txt` gives you the SHA-256 of each one. Drop a hash into
+`https://www.virustotal.com/gui/file/<sha256>` (or use `--vt-links`) to see how 70+
+AV engines rate it. A YARA hit or an IOC match on a sideloaded app is your signal to
+uninstall and investigate.
+
 Have a VirusTotal API key? Get automatic detection scores for every hash, IP and domain:
 
 ```bash
@@ -116,11 +153,17 @@ Each run writes to `tv-triage-runs/<timestamp>_<build-id>/`:
 
 ## 🧪 Validated against a real device
 
-First real-world target: a retail **onn. 4K Pro (Google TV, Android 14)**.
-Result — **85/100, grade B, clean:** locked/verified firmware, SELinux enforcing,
-0/182 IOC matches, and all sideloaded APKs scanned clean against the YARA rules with
-hashes verified against the device. The low-severity points were ordinary hygiene
-(third-party boot receivers, a few sideloaded apps to review).
+First real-world target: a retail **onn. 4K Pro** — a legitimate, **Google-certified,
+Play-Protect Google TV device** (Android 14), *not* an off-brand box. Result —
+**85/100, grade B, clean:** locked/verified firmware, SELinux enforcing, 0/182 IOC
+matches, and all sideloaded APKs scanned clean against the YARA rules with hashes
+verified against the device.
+
+This is exactly the sideload-vetting use case in action: the device itself was fine,
+and the tool's real job was to **surface the 16 apps installed outside the Play Store**
+and confirm — via YARA, IOC matching, and hashes — that none were malicious. The
+low-severity points were ordinary hygiene (third-party boot receivers, a few sideloaded
+apps worth a look).
 
 ---
 
@@ -133,9 +176,11 @@ hashes verified against the device. The low-severity points were ordinary hygien
 - **IOC/C2 infrastructure rotates.** Refresh `gtv-iocs.txt` before an engagement.
 - **Dual-use flags happen.** Proxyware SDKs also ship in legitimate "earn money" apps —
   a hit means *review*, not *proof*.
-- Google notes these infections are on **non-Play-Protect-certified AOSP boxes**, not
-  licensed Google TV / Android TV devices. "Google TV" is used loosely here for the
-  affected low-cost streaming-box ecosystem.
+- **Works on any device, but the two threats differ.** The *preinstalled-malware*
+  families (BADBOX/Vo1d) are overwhelmingly found on **non-Play-Protect-certified AOSP
+  boxes**, per Google — a certified device is very unlikely to ship with them. The
+  *sideload-vetting* use case applies to **every** Android TV / Google TV device,
+  certified or not, because sideloading bypasses Play Protect regardless of brand.
 
 ---
 
