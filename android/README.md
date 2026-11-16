@@ -8,6 +8,8 @@ installed outside the official store.
 > **Status:** compiling scaffold with the core logic ported and a first working
 > app-list screen. Not yet a finished app — see *Roadmap* below.
 
+![TV banner](app/src/main/res/drawable-xhdpi/banner.png)
+
 ## What it does today
 
 - Enumerates every installed package (`QUERY_ALL_PACKAGES`)
@@ -34,6 +36,28 @@ installed outside the official store.
   target
 - Optional **VirusTotal API** mode — enter a key (⚙, stored app-private) and query
   live detection counts (`malicious / total engines`) per hash, on demand
+
+## Validation status
+
+The app itself still needs a first build + install on real hardware (the Gradle
+wrapper jar isn't checked in; open in Android Studio). What **has** been validated
+on a real **onn. 4K Pro** (jarvis2, Android 14):
+
+- **Core triage logic** — the ADB tool these classes port scored the device
+  **85/100 (grade B)**: firmware locked/verified, SELinux enforcing, 0/182 IOC hits,
+  and it correctly surfaced the sideloaded apps (CouchCam, Sofa/TV browsers, etc.) —
+  the same installer-attribution and scoring the Kotlin core reproduces.
+- **On-device YARA engine** — the exact matching logic in `YaraEngine` was run
+  against the device's **6 real sideloaded APKs** and cross-checked against the
+  stock `yara` binary:
+  - on all 6 real APKs: **both agree — no hits** (correct; they're clean), and
+  - with indicators planted into an APK's entries: the engine reports
+    `BADBOX_Loader, Botnet_C2_Domains, Vo1d_Backdoor` — **identical** to `yara -r`
+    on the decompressed entries. (Because it decompresses ZIP entries, it actually
+    catches strings that raw-byte `yara file.apk` misses inside compressed DEX.)
+
+Still pending: installing the built APK on the TV, and a run on an actual **Fire TV
+Stick** (Fire OS paths are implemented and unit-logic-tested, not yet hardware-run).
 
 ## What it deliberately does NOT do (this tier)
 
@@ -111,5 +135,7 @@ android/
 - [ ] Harden key storage with EncryptedSharedPreferences (androidx.security)
 - [x] Export / share the report (plain-text, ACTION_SEND + clipboard/file fallback)
 - [ ] Optional **Shizuku** mode for process/socket/dumpsys depth (ADB-tool parity)
-- [ ] Proper TV banner artwork + Compose-for-TV focus polish
-- [ ] Real-device validation (onn. 4K Pro + Fire TV Stick)
+- [x] Proper TV banner artwork (320×180) + D-pad focus polish (focus highlight +
+      scale, initial focus on the action bar)
+- [~] Real-device validation — see below. Core logic + YARA engine validated on a
+      real onn. 4K Pro; on-hardware APK install and a Fire TV Stick still pending.

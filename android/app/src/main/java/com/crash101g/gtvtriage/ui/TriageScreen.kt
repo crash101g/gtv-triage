@@ -3,10 +3,14 @@ package com.crash101g.gtvtriage.ui
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +32,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -107,6 +115,8 @@ private fun Report(report: TriageReport) {
     }
 
     val context = LocalContext.current
+    val shareFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { shareFocus.requestFocus() } }
     val gradeColor = when (report.grade) {
         "A", "B" -> Green
         "C", "D" -> Yellow
@@ -122,7 +132,10 @@ private fun Report(report: TriageReport) {
                 Text("⚙ VT key", color = Dim)
             }
             Spacer(Modifier.width(8.dp))
-            Button(onClick = { ReportShare.share(context, report) }) {
+            Button(
+                onClick = { ReportShare.share(context, report) },
+                modifier = Modifier.focusRequester(shareFocus),
+            ) {
                 Text("Export / Share")
             }
         }
@@ -277,11 +290,26 @@ private fun AppRow(app: AppEntry, onOpenVt: () -> Unit) {
         else -> Dim
     }
     val hasVt = app.virusTotalUrl != null
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    // D-pad focus highlight: a focused card brightens its border and lifts slightly.
+    val scale by animateFloatAsState(if (focused) 1.025f else 1f, label = "cardScale")
+    val borderColor by animateColorAsState(
+        if (focused) Color.White else accent.copy(alpha = 0.4f),
+        label = "cardBorder",
+    )
     Card(
         Modifier
             .fillMaxWidth()
-            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-            .then(if (hasVt) Modifier.clickable { onOpenVt() } else Modifier),
+            .scale(scale)
+            .border(if (focused) 2.dp else 1.dp, borderColor, RoundedCornerShape(8.dp))
+            .then(
+                if (hasVt) {
+                    Modifier.clickable(interactionSource = interaction, indication = null) { onOpenVt() }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
