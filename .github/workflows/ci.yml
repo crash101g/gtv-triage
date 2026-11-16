@@ -60,12 +60,15 @@ jobs:
   python:
     name: Python syntax check
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.8"
+          python-version: ${{ matrix.python-version }}
       - name: Compile (stdlib only — no install step)
         run: |
           python -m py_compile gtv-triage.py
-          echo "✅ gtv-triage.py compiles"
+          echo "✅ gtv-triage.py compiles on ${{ matrix.python-version }}"
